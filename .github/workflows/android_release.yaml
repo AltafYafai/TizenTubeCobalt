@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   android-arm64:
@@ -12,21 +16,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Cache Gradle
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           key: gradle-cache-${{ hashFiles('starboard/android/apk/**/*gradle*') }}
           path: |
             /root/.gradle/caches
             /root/.gradle/wrapper
-      - name: Set up Cloud SDK
-        uses: isarkis/setup-gcloud@40dce7857b354839efac498d3632050f568090b6
       - name: Set Android env vars
         run: |
           export ANDROID_HOME="$GITHUB_WORKSPACE/Android"
           mkdir -p "$ANDROID_HOME"
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-          PROJECT_NAME=$(gcloud config get-value project)
       - name: Install GN
         run: |
           wget https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest -O gn.zip
@@ -62,14 +63,18 @@ jobs:
         run: |
           NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
           ninja -C out/android-arm64_gold cobalt_install
-      - name: Upload APK to release
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: out/android-arm64_gold/cobalt.apk
-          asset_name: cobalt-android-arm64.apk
-          tag: ${{ github.ref_name }}
-          overwrite: true
+          name: cobalt-android-arm64
+          path: out/android-arm64_gold/cobalt.apk
+          if-no-files-found: error
+      - name: Upload APK to release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: out/android-arm64_gold/cobalt.apk
+          tag_name: ${{ github.ref_name }}
 
   android-arm:
     runs-on: ubuntu-latest
@@ -77,21 +82,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Cache Gradle
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           key: gradle-cache-${{ hashFiles('starboard/android/apk/**/*gradle*') }}
           path: |
             /root/.gradle/caches
             /root/.gradle/wrapper
-      - name: Set up Cloud SDK
-        uses: isarkis/setup-gcloud@40dce7857b354839efac498d3632050f568090b6
       - name: Set Android env vars
         run: |
           export ANDROID_HOME="$GITHUB_WORKSPACE/Android"
           mkdir -p "$ANDROID_HOME"
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-          PROJECT_NAME=$(gcloud config get-value project)
       - name: Install GN
         run: |
           wget https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest -O gn.zip
@@ -127,11 +129,15 @@ jobs:
         run: |
           NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
           ninja -C out/android-arm_gold cobalt_install
-      - name: Upload APK to release
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: out/android-arm_gold/cobalt.apk
-          asset_name: cobalt-android-arm.apk
-          tag: ${{ github.ref_name }}
-          overwrite: true
+          name: cobalt-android-arm
+          path: out/android-arm_gold/cobalt.apk
+          if-no-files-found: error
+      - name: Upload APK to release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: out/android-arm_gold/cobalt.apk
+          tag_name: ${{ github.ref_name }}
